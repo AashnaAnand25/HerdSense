@@ -61,6 +61,16 @@ export default function AnimalProfile() {
   const sensorData = animal ? getSensorData(animal.id) : [];
   const timeline = animal ? getHealthTimeline(animal.id) : [];
 
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith("image/")) {
+      const url = URL.createObjectURL(file);
+      setUploadedImage(url);
+    }
+  }, []);
+
   if (!animal) {
     return (
       <AppLayout>
@@ -75,16 +85,6 @@ export default function AnimalProfile() {
       </AppLayout>
     );
   }
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith("image/")) {
-      const url = URL.createObjectURL(file);
-      setUploadedImage(url);
-    }
-  }, []);
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
