@@ -1,7 +1,7 @@
 import AppLayout from "@/components/AppLayout";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Sliders, Shield, Eye, Info, ChevronRight } from "lucide-react";
+import { Sliders, Shield, Eye, Info, Key } from "lucide-react";
 
 export default function Settings() {
   const [farmName, setFarmName] = useState("Meadowbrook Farm");
@@ -11,6 +11,7 @@ export default function Settings() {
   const [alertThreshold, setAlertThreshold] = useState(70);
   const [judgeMode, setJudgeMode] = useState(true);
   const [saved, setSaved] = useState(false);
+  const hasEnvKey = Boolean(import.meta.env.VITE_ANTHROPIC_API_KEY?.trim());
 
   const handleSave = () => {
     setSaved(true);
@@ -111,6 +112,30 @@ export default function Settings() {
           </div>
         </div>
 
+        {/* Field Oracle */}
+        <div className="card-glass rounded-xl overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+            <Key size={14} className="text-primary" />
+            <h3 className="font-display text-sm font-bold text-foreground">Field Oracle</h3>
+          </div>
+          <div className="p-4 space-y-4">
+            <div className="flex items-start justify-between gap-4 rounded-lg bg-field-700 border border-border p-4">
+              <div>
+                <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1">Anthropic API Key</p>
+                <p className="text-sm text-foreground">
+                  {hasEnvKey ? "Loaded from `.env.local`." : "No `.env.local` key found. Field Oracle will run in demo mode unless you enter one for the current session."}
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Add `VITE_ANTHROPIC_API_KEY` to `.env.local` in the project root to make Field Oracle auto-use Claude on startup.
+                </p>
+              </div>
+              <div className="px-3 py-2 rounded-lg border border-border text-xs font-mono text-muted-foreground">
+                {hasEnvKey ? "Env Key Present" : "Demo / Session Mode"}
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Judge Mode */}
         <div className="card-glass rounded-xl overflow-hidden border border-primary/20">
           <div className="flex items-center justify-between px-4 py-3 border-b border-primary/20">
@@ -134,7 +159,7 @@ export default function Settings() {
                   {judgeMode ? "✓ Judge Mode ACTIVE" : "Judge Mode DISABLED"}
                 </p>
                 <p className="text-xs font-body text-muted-foreground">
-                  When enabled, all sensor data, animal profiles, and AI responses use synthetic pre-cached data. No private API keys required. FarmGPT uses demo responses based on pre-loaded farm documents.
+                  When enabled, all sensor data, animal profiles, and AI responses use synthetic pre-cached data. No private API keys required. Field Oracle uses demo responses based on the sample farm documents.
                 </p>
               </div>
             </div>
@@ -163,7 +188,7 @@ export default function Settings() {
             </div>
             <div>
               <h4 className="font-display text-xs font-bold text-foreground uppercase tracking-wider mb-2">Data Privacy</h4>
-              <p className="text-xs">All sensor data is processed on-device where possible. Farm documents uploaded to FarmGPT are processed in-session only and never stored on external servers. API keys are held in component state and never logged.</p>
+              <p className="text-xs">All sensor data is processed on-device where possible. Farm documents uploaded to Field Oracle are parsed in the browser and kept in session state. If configured, the Anthropic API key is read from the local `.env.local` file at build/runtime for this frontend app.</p>
             </div>
           </div>
         </div>

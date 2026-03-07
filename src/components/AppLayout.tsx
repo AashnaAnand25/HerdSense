@@ -1,8 +1,9 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Bell, Settings, Activity, LayoutDashboard, MessageSquare, Radio } from "lucide-react";
+import { Bell, Settings, LayoutDashboard, MessageSquare, Radio } from "lucide-react";
 import { motion } from "framer-motion";
 import { RECENT_ALERTS } from "@/data/syntheticData";
+import { HerdSenseLogo } from "@/components/brand/HerdSenseLogo";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -11,7 +12,7 @@ interface AppLayoutProps {
 const NAV_ITEMS = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/livefeed",  icon: Radio,           label: "Live Feed" },
-  { to: "/farmgpt",   icon: MessageSquare,   label: "FarmGPT" },
+  { to: "/field-oracle", icon: MessageSquare, label: "Field Oracle" },
   { to: "/settings",  icon: Settings,        label: "Settings" },
 ];
 
@@ -27,12 +28,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           {/* Logo */}
           <Link to="/dashboard" className="flex items-center gap-2.5 group">
             <div className="relative">
-              <svg width="32" height="28" viewBox="0 0 32 28" fill="none">
-                <path d="M4 20 C4 20, 2 16, 2 12 C2 7, 6 4, 10 4 C13 4, 15 6, 16 8 C17 6, 19 4, 22 4 C26 4, 30 7, 30 12 C30 16, 28 20, 28 20" stroke="hsl(88 100% 62%)" strokeWidth="2" strokeLinecap="round" fill="none"/>
-                <ellipse cx="16" cy="21" rx="10" ry="5" stroke="hsl(88 100% 62%)" strokeWidth="1.5" fill="none"/>
-                <path d="M10 4 L8 0 M22 4 L24 0" stroke="hsl(88 100% 62%)" strokeWidth="1.5" strokeLinecap="round"/>
-                <path d="M8 12 Q10 16 12 12 Q14 8 16 12 Q18 16 20 12" stroke="hsl(88 100% 62%)" strokeWidth="1" strokeLinecap="round" fill="none" opacity="0.6"/>
-              </svg>
+              <HerdSenseLogo className="w-8 h-8" />
               <div className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-primary animate-pulse-lime" />
             </div>
             <span className="font-display font-bold text-lg text-primary group-hover:text-lime-glow transition-colors">

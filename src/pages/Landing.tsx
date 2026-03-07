@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useEffect, useRef } from "react";
+import { HerdSenseLogo } from "@/components/brand/HerdSenseLogo";
 
 function ParticleField() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -84,12 +85,7 @@ export default function Landing() {
             animate={{ filter: ["drop-shadow(0 0 8px rgba(168,255,62,0.3))", "drop-shadow(0 0 20px rgba(168,255,62,0.6))", "drop-shadow(0 0 8px rgba(168,255,62,0.3))"] }}
             transition={{ duration: 3, repeat: Infinity }}
           >
-            <svg width="64" height="56" viewBox="0 0 32 28" fill="none">
-              <path d="M4 20 C4 20, 2 16, 2 12 C2 7, 6 4, 10 4 C13 4, 15 6, 16 8 C17 6, 19 4, 22 4 C26 4, 30 7, 30 12 C30 16, 28 20, 28 20" stroke="hsl(88 100% 62%)" strokeWidth="2" strokeLinecap="round" fill="none"/>
-              <ellipse cx="16" cy="21" rx="10" ry="5" stroke="hsl(88 100% 62%)" strokeWidth="1.5" fill="none"/>
-              <path d="M10 4 L8 0 M22 4 L24 0" stroke="hsl(88 100% 62%)" strokeWidth="1.5" strokeLinecap="round"/>
-              <path d="M8 12 Q10 16 12 12 Q14 8 16 12 Q18 16 20 12" stroke="hsl(88 100% 62%)" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
-            </svg>
+            <HerdSenseLogo className="w-20 h-20" />
           </motion.div>
 
           <h1 className="font-display text-5xl font-bold text-primary mb-2 tracking-tight">HerdSense</h1>

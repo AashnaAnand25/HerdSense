@@ -7,7 +7,7 @@ import { AnimatePresence } from "framer-motion";
 import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
 import AnimalProfile from "./pages/AnimalProfile";
-import FarmGPT from "./pages/FarmGPT";
+import FieldOracle from "./pages/FieldOracle";
 import LiveFeed from "./pages/LiveFeed";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
@@ -26,7 +26,8 @@ const App = () => (
               <Route path="/" element={<Landing />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/animal/:id" element={<AnimalProfile />} />
-              <Route path="/farmgpt" element={<FarmGPT />} />
+              <Route path="/field-oracle" element={<FieldOracle />} />
+              <Route path="/farmgpt" element={<Navigate to="/field-oracle" replace />} />
               <Route path="/livefeed" element={<LiveFeed />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />

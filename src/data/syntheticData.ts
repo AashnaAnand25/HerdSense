@@ -148,7 +148,7 @@ export function getHealthTimeline(animalId: string) {
   return events;
 }
 
-// Synthetic farm document content for FarmGPT
+// Legacy synthetic farm document content
 export const FARM_DOCUMENTS = {
   "2024 Annual Farm Report.pdf": `
 MEADOWBROOK FARM — 2024 ANNUAL HEALTH & OPERATIONS REPORT

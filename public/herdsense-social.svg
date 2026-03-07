@@ -1,0 +1,53 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="106" y1="42" x2="1110" y2="592" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#102016" />
+      <stop offset="55%" stop-color="#0A130D" />
+      <stop offset="100%" stop-color="#071009" />
+    </linearGradient>
+    <linearGradient id="stroke" x1="344" y1="140" x2="596" y2="404" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#C5FF6C" />
+      <stop offset="100%" stop-color="#4CF0AF" />
+    </linearGradient>
+    <radialGradient id="tile" cx="0" cy="0" r="1" gradientTransform="translate(470 275) rotate(90) scale(170)" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#183220" />
+      <stop offset="100%" stop-color="#09110C" />
+    </radialGradient>
+  </defs>
+
+  <rect width="1200" height="630" rx="40" fill="url(#bg)" />
+  <circle cx="954" cy="176" r="184" fill="#A8FF3E" fill-opacity="0.08" />
+  <circle cx="926" cy="438" r="220" fill="#2DE0A0" fill-opacity="0.06" />
+
+  <g opacity="0.22">
+    <path d="M0 94H1200" stroke="#A8FF3E" stroke-opacity="0.18" />
+    <path d="M0 170H1200" stroke="#A8FF3E" stroke-opacity="0.18" />
+    <path d="M0 246H1200" stroke="#A8FF3E" stroke-opacity="0.18" />
+    <path d="M0 322H1200" stroke="#A8FF3E" stroke-opacity="0.18" />
+    <path d="M0 398H1200" stroke="#A8FF3E" stroke-opacity="0.18" />
+    <path d="M0 474H1200" stroke="#A8FF3E" stroke-opacity="0.18" />
+    <path d="M0 550H1200" stroke="#A8FF3E" stroke-opacity="0.18" />
+    <path d="M108 0V630" stroke="#A8FF3E" stroke-opacity="0.18" />
+    <path d="M224 0V630" stroke="#A8FF3E" stroke-opacity="0.18" />
+    <path d="M340 0V630" stroke="#A8FF3E" stroke-opacity="0.18" />
+    <path d="M456 0V630" stroke="#A8FF3E" stroke-opacity="0.18" />
+    <path d="M572 0V630" stroke="#A8FF3E" stroke-opacity="0.18" />
+    <path d="M688 0V630" stroke="#A8FF3E" stroke-opacity="0.18" />
+    <path d="M804 0V630" stroke="#A8FF3E" stroke-opacity="0.18" />
+    <path d="M920 0V630" stroke="#A8FF3E" stroke-opacity="0.18" />
+    <path d="M1036 0V630" stroke="#A8FF3E" stroke-opacity="0.18" />
+  </g>
+
+  <rect x="314" y="118" width="312" height="312" rx="96" fill="url(#tile)" stroke="url(#stroke)" stroke-width="12" />
+  <path d="M413 210C402 178 380 164 346 164C351 190 366 213 394 224" stroke="url(#stroke)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M527 210C538 178 560 164 594 164C589 190 574 213 546 224" stroke="url(#stroke)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M389 240C389 209 414 184 445 184H495C526 184 551 209 551 240V265C551 306 518 339 477 339H463C422 339 389 306 389 265V240Z" stroke="url(#stroke)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M410 292H440L458 264L478 314L498 282H529" stroke="url(#stroke)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M424 368C436 383 450 390 470 390C490 390 504 383 516 368" stroke="url(#stroke)" stroke-width="16" stroke-linecap="round" />
+  <circle cx="569" cy="179" r="18" fill="#A8FF3E" fill-opacity="0.95" />
+  <circle cx="569" cy="179" r="35" stroke="#A8FF3E" stroke-opacity="0.35" stroke-width="8" />
+
+  <text x="674" y="270" fill="#F3F7F2" font-family="Syne, Arial, sans-serif" font-size="96" font-weight="700">HerdSense</text>
+  <text x="674" y="336" fill="#A8FF3E" font-family="IBM Plex Mono, Menlo, monospace" font-size="28" letter-spacing="8">AI LIVESTOCK HEALTH INTELLIGENCE</text>
+  <text x="674" y="430" fill="#CFD8CF" font-family="DM Sans, Arial, sans-serif" font-size="42">Every animal. Every signal. Every second.</text>
+</svg>

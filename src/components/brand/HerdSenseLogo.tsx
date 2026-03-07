@@ -1,0 +1,90 @@
+import { cn } from "@/lib/utils";
+
+interface HerdSenseLogoProps {
+  className?: string;
+  title?: string;
+}
+
+export function HerdSenseLogo({
+  className,
+  title = "HerdSense logo",
+}: HerdSenseLogoProps) {
+  return (
+    <svg
+      viewBox="0 0 64 64"
+      role="img"
+      aria-label={title}
+      className={cn("overflow-visible", className)}
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <defs>
+        <linearGradient id="herdsense-stroke" x1="10" y1="8" x2="54" y2="56" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="hsl(88 100% 70%)" />
+          <stop offset="100%" stopColor="hsl(160 76% 58%)" />
+        </linearGradient>
+        <radialGradient id="herdsense-fill" cx="0" cy="0" r="1" gradientTransform="translate(32 32) rotate(90) scale(30)">
+          <stop offset="0%" stopColor="hsl(135 38% 15%)" />
+          <stop offset="100%" stopColor="hsl(135 50% 6%)" />
+        </radialGradient>
+      </defs>
+
+      <rect
+        x="10"
+        y="10"
+        width="44"
+        height="44"
+        rx="14"
+        fill="url(#herdsense-fill)"
+        stroke="url(#herdsense-stroke)"
+        strokeWidth="2"
+      />
+
+      <path
+        d="M24 23C22.5 18.5 19.5 16.5 15 16.5C15.7 20.2 17.8 23.3 21.6 24.8"
+        stroke="url(#herdsense-stroke)"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <path
+        d="M40 23C41.5 18.5 44.5 16.5 49 16.5C48.3 20.2 46.2 23.3 42.4 24.8"
+        stroke="url(#herdsense-stroke)"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+
+      <path
+        d="M21 27C21 22.6 24.6 19 29 19H35C39.4 19 43 22.6 43 27V30.5C43 36.3 38.3 41 32.5 41H31.5C25.7 41 21 36.3 21 30.5V27Z"
+        stroke="url(#herdsense-stroke)"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+
+      <path
+        d="M24 34H28L30.6 30L33.4 37L36.2 32.5H40"
+        stroke="url(#herdsense-stroke)"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+
+      <path
+        d="M26 45C27.7 47.1 29.7 48 32 48C34.3 48 36.3 47.1 38 45"
+        stroke="url(#herdsense-stroke)"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        fill="none"
+        opacity="0.95"
+      />
+
+      <circle cx="45.5" cy="18.5" r="3.2" fill="hsl(88 100% 62%)" opacity="0.95" />
+      <circle cx="45.5" cy="18.5" r="6.5" stroke="hsl(88 100% 62% / 0.35)" strokeWidth="1.5" fill="none" />
+    </svg>
+  );
+}
