@@ -3,8 +3,10 @@ import { Link } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertCircle,
+  BookOpen,
   CheckSquare,
   Copy,
+  Download,
   FileText,
   Key,
   Loader2,
@@ -14,6 +16,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import { jsPDF } from "jspdf";
 import * as pdfjsLib from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import AppLayout from "@/components/AppLayout";
@@ -29,6 +32,7 @@ import {
   FieldOracleStructuredResponse,
   inferFieldOracleDocType,
 } from "@/data/fieldOracle";
+import { VET_REFERENCE_MANUALS } from "@/data/referenceManuals";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
@@ -71,19 +75,22 @@ type FieldOracleMessage = UserMessage | AssistantMessage;
 const SYSTEM_PROMPT = `You are Field Oracle, an agricultural document assistant. 
 
 STRICT RULES:
-1. ONLY answer from the documents provided below. Never use outside knowledge for specific facts, numbers, or dates.
-2. ALWAYS quote the exact supporting text from the document in your response under "Supporting Evidence"
-3. ALWAYS state your confidence level: High (directly supported), Moderate (partially supported), or Not Found (not in documents)
-4. If information is not in the documents say exactly: "This information is not in your current documents" and suggest what document type would contain it
-5. NEVER invent statistics, animal counts, costs, or dates
-6. If asked to make a checklist, format as numbered action items
-7. Keep answers concise — farmers are busy
+1. Answer using BOTH the provided farm documents and the Veterinary Reference Manuals.
+2. ALWAYS distinguish between farm-specific facts (from Documents) and general medical/technical knowledge (from Manuals).
+3. ALWAYS cite your sources. 
+   - For farm documents, use: [Source: Document Name]
+   - For veterinary manuals, use: [Source: Merck Veterinary Manual — Section Name]
+4. ALWAYS start medical advice with "Based on the [Manual Name]..." to build trust.
+5. If information is not in the documents or manuals, say: "This information is not in your current documents or reference manuals."
+6. NEVER invent statistics, animal counts, or medical facts.
+7. STATE your confidence level: High (directly supported), Moderate (partially supported), or Not Found.
+8. Keep answers concise.
 
 FORMAT EVERY RESPONSE EXACTLY LIKE THIS:
 **Answer:** [direct answer here]
 
 **Supporting Evidence:**
-[Source: Document Name — Section]: "exact quoted text from document..."
+[Source: Name — Section]: "exact quoted text..."
 
 **Confidence:** [High/Moderate/Not Found] — [one sentence explanation]`;
 
@@ -118,12 +125,12 @@ function createInitialDocuments(): FieldOracleDocument[] {
 function createInitialMessage(): AssistantMessage {
   const response: FieldOracleStructuredResponse = {
     answer:
-      "Upload a farm PDF or use the sample documents to ask grounded questions with citations. Field Oracle answers only from the documents you include in context.",
+      "Upload farm PDFs or enable Vet Reference Manuals to ask grounded health questions. Field Oracle combines your specific farm data with clinical knowledge.",
     evidence: [
       {
-        source: "Field Oracle — Demo Workspace",
+        source: "Field Oracle — Workspace",
         quote:
-          "Five sample documents are pre-loaded so you can test annual reports, vet records, SOPs, extension factsheets, and feed cost logs without uploading your own files.",
+          "Reference manuals and farm documents are now integrated. You can ask about symptoms and compare them with your farm's history.",
       },
     ],
     confidence: "High",
@@ -254,29 +261,17 @@ function getConversationHistory(messages: FieldOracleMessage[]) {
   }));
 }
 
-function getNotFoundSuggestion(question: string) {
-  const q = question.toLowerCase();
-
-  if (q.includes("cost") || q.includes("feed")) return "a feed purchase log or budget report";
-  if (q.includes("vet") || q.includes("animal") || q.includes("follow-up")) return "detailed veterinary records";
-  if (q.includes("sop") || q.includes("checklist")) return "an operations SOP";
-  if (q.includes("disease") || q.includes("foot rot") || q.includes("treatment")) return "an extension factsheet or treatment protocol";
-  return "the specific farm document that covers that topic";
-}
-
 function buildNotFoundResponse(question: string): FieldOracleStructuredResponse {
-  const suggestion = getNotFoundSuggestion(question);
-
   return {
-    answer: `This information is not in your current documents. Try uploading ${suggestion}.`,
+    answer: `This information is not in your current documents or manuals. Try uploading more records or enabling more reference manuals.`,
     evidence: [
       {
-        source: "Current document set — Search result",
-        quote: `No directly supporting passage was found for the question: "${question}".`,
+        source: "Workspace Search",
+        quote: `No directly supporting passage was found for: "${question}".`,
       },
     ],
     confidence: "Not Found",
-    confidenceNote: "No matching evidence was found in the currently selected documents.",
+    confidenceNote: "No matching evidence was found in the active context.",
   };
 }
 
@@ -295,7 +290,7 @@ function buildChecklistItems(answer: string) {
           .filter(part => part.length > 0);
 
   return baseItems
-    .map(item => item.replace(/^Use this winter feeding checklist:\s*/i, "").trim())
+    .map(item => item.replace(/^Use this checklist:\s*/i, "").trim())
     .filter(item => item.length > 0)
     .map(item => ({
       id: crypto.randomUUID(),
@@ -370,9 +365,6 @@ function DocumentCard({
               {document.type}
             </span>
             <span className="text-[11px] font-mono text-muted-foreground">{document.pageCount} pages</span>
-            <span className="text-[11px] font-mono text-muted-foreground">
-              {document.source === "demo" ? "Demo" : "Uploaded"}
-            </span>
           </div>
         </div>
       </div>
@@ -385,11 +377,13 @@ function AssistantResponseCard({
   onGenerateChecklist,
   onToggleChecklistItem,
   onCopyChecklist,
+  onDownloadReport,
 }: {
   message: AssistantMessage;
   onGenerateChecklist: (id: string) => void;
   onToggleChecklistItem: (messageId: string, itemId: string) => void;
   onCopyChecklist: (messageId: string) => void;
+  onDownloadReport: (message: AssistantMessage) => void;
 }) {
   const { response, checklist } = message;
   const confidenceLabel =
@@ -411,7 +405,16 @@ function AssistantResponseCard({
       <div className="w-full max-w-4xl rounded-2xl border border-border bg-field-700/80 p-4">
         <div className="space-y-4">
           <section>
-            <p className="mb-2 text-[11px] font-mono uppercase tracking-[0.2em] text-muted-foreground">Answer</p>
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-[11px] font-mono uppercase tracking-[0.2em] text-muted-foreground">Answer</p>
+              <button
+                onClick={() => onDownloadReport(message)}
+                className="inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-2 py-1 text-[11px] font-mono text-primary transition-colors hover:bg-primary/10"
+              >
+                <Download size={12} />
+                Download Report
+              </button>
+            </div>
             {checklist ? (
               <div className="rounded-xl border border-primary/20 bg-field-800/80 p-3">
                 <div className="mb-3 flex items-center justify-between gap-3">
@@ -681,6 +684,7 @@ function ApiKeyModal({
 
 export default function FieldOracle() {
   const [documents, setDocuments] = useState<FieldOracleDocument[]>(createInitialDocuments);
+  const [enabledManualIds, setEnabledManualIds] = useState<string[]>(["merck-cattle-001", "merck-cattle-002"]);
   const [messages, setMessages] = useState<FieldOracleMessage[]>([createInitialMessage()]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -720,6 +724,11 @@ export default function FieldOracle() {
     [documents],
   );
 
+  const selectedManuals = useMemo(
+    () => VET_REFERENCE_MANUALS.filter(manual => enabledManualIds.includes(manual.id)),
+    [enabledManualIds],
+  );
+
   const submitQuestion = async (question: string) => {
     const trimmed = question.trim();
     if (!trimmed || isLoading) return;
@@ -727,24 +736,6 @@ export default function FieldOracle() {
     if (!apiKey && !demoModeConfirmed) {
       setPendingQuestion(trimmed);
       setShowKeyModal(true);
-      return;
-    }
-
-    if (selectedDocuments.length === 0) {
-      const userMessage = createUserMessage(trimmed);
-      const assistantMessage = createAssistantMessage({
-        answer: "This information is not in your current documents. Turn on at least one document to ask a question.",
-        evidence: [
-          {
-            source: "Document Library — Active context",
-            quote: "No documents are currently toggled on for this chat.",
-          },
-        ],
-        confidence: "Not Found",
-        confidenceNote: "There is no active document context available for grounding.",
-      });
-      setMessages(previous => [...previous, userMessage, assistantMessage]);
-      setInput("");
       return;
     }
 
@@ -756,27 +747,22 @@ export default function FieldOracle() {
 
     try {
       const assistantResponse = apiKey
-        ? await requestClaudeResponse(trimmed, nextMessages, selectedDocuments, apiKey)
+        ? await requestClaudeResponse(trimmed, nextMessages, selectedDocuments, selectedManuals, apiKey)
         : await requestDemoResponse(trimmed);
 
       setMessages(previous => [...previous, createAssistantMessage(assistantResponse)]);
     } catch (error) {
-      const fallbackResponse =
-        !apiKey || FIELD_ORACLE_SUGGESTED_QUESTIONS.includes(trimmed as (typeof FIELD_ORACLE_SUGGESTED_QUESTIONS)[number])
-          ? await requestDemoResponse(trimmed)
-          : {
-              answer:
-                "Live Claude request failed, so this reply could not be generated from your current documents right now.",
-              evidence: [
-                {
-                  source: "Anthropic API — Request status",
-                  quote:
-                    error instanceof Error ? error.message : "The Claude request failed before a response was returned.",
-                },
-              ],
-              confidence: "Moderate" as const,
-              confidenceNote: "The failure was technical rather than document-related.",
-            };
+      const fallbackResponse = {
+        answer: "The request failed. Please check your internet connection or API key.",
+        evidence: [
+          {
+            source: "System Error",
+            quote: error instanceof Error ? error.message : "An unknown error occurred.",
+          },
+        ],
+        confidence: "Moderate" as const,
+        confidenceNote: "The failure was technical.",
+      };
 
       setMessages(previous => [...previous, createAssistantMessage(fallbackResponse)]);
     } finally {
@@ -793,8 +779,11 @@ export default function FieldOracle() {
     question: string,
     conversation: FieldOracleMessage[],
     activeDocuments: FieldOracleDocument[],
+    activeManuals: typeof VET_REFERENCE_MANUALS,
     userApiKey: string,
   ) => {
+    const manualContext = activeManuals.map(m => `=== REFERENCE MANUAL: ${m.name} ===\n${m.content}`).join("\n\n");
+    
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -804,12 +793,15 @@ export default function FieldOracle() {
         "anthropic-dangerous-direct-browser-access": "true",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1000,
+        model: "claude-sonnet-4-6",
+        max_tokens: 1500,
         system: `${SYSTEM_PROMPT}
 
-LOADED DOCUMENTS:
-${buildDocumentContext(activeDocuments)}`,
+LOADED FARM DOCUMENTS:
+${buildDocumentContext(activeDocuments)}
+
+LOADED REFERENCE MANUALS:
+${manualContext}`,
         messages: getConversationHistory(conversation),
       }),
     });
@@ -820,17 +812,68 @@ ${buildDocumentContext(activeDocuments)}`,
     }
 
     const data = await response.json();
-    const text = (data.content ?? [])
-      .filter((block: { type?: string; text?: string }) => block.type === "text" && block.text)
-      .map((block: { text: string }) => block.text)
-      .join("\n\n")
-      .trim();
+    const text = data.content[0].text;
 
     if (!text) {
       return buildNotFoundResponse(question);
     }
 
     return parseClaudeResponse(text);
+  };
+
+  const handleDownloadReport = (message: AssistantMessage) => {
+    const doc = new jsPDF();
+    const { response } = message;
+
+    // Header
+    doc.setFillColor(88, 100, 62); // Lime green
+    doc.rect(0, 0, 210, 40, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.text("HerdSense: Clinical Health Report", 20, 25);
+    
+    doc.setFontSize(10);
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, 34);
+
+    // Answer Section
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(14);
+    doc.text("Assessment", 20, 55);
+    doc.setFontSize(11);
+    const splitAnswer = doc.splitTextToSize(response.answer, 170);
+    doc.text(splitAnswer, 20, 65);
+
+    // Evidence Section
+    let yPos = 65 + (splitAnswer.length * 7) + 10;
+    doc.setFontSize(14);
+    doc.text("Supporting Evidence & Citations", 20, yPos);
+    yPos += 10;
+    
+    response.evidence.forEach((ev) => {
+      doc.setFontSize(10);
+      doc.setTextColor(88, 100, 62);
+      doc.text(`Source: ${ev.source}`, 20, yPos);
+      yPos += 5;
+      doc.setTextColor(100, 100, 100);
+      const splitQuote = doc.splitTextToSize(`"${ev.quote}"`, 170);
+      doc.text(splitQuote, 20, yPos);
+      yPos += (splitQuote.length * 5) + 5;
+    });
+
+    // Confidence
+    doc.setFontSize(12);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`Confidence Level: ${response.confidence}`, 20, yPos + 5);
+
+    doc.save(`HerdSense-Report-${Date.now()}.pdf`);
+  };
+
+  const handleToggleManual = (manualId: string) => {
+    setEnabledManualIds(prev => 
+      prev.includes(manualId) 
+        ? prev.filter(id => id !== manualId) 
+        : [...prev, manualId]
+    );
   };
 
   const handleTextareaInput = (event: React.FormEvent<HTMLTextAreaElement>) => {
@@ -958,10 +1001,10 @@ ${buildDocumentContext(activeDocuments)}`,
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-[11px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
-                  Document Library
+                  Knowledge Hub
                 </p>
                 <p className="mt-1 text-sm text-foreground">
-                  {selectedDocuments.length} document{selectedDocuments.length === 1 ? "" : "s"} in context
+                  {selectedDocuments.length + enabledManualIds.length} sources active
                 </p>
               </div>
               <button
@@ -969,7 +1012,7 @@ ${buildDocumentContext(activeDocuments)}`,
                 className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-lime-glow"
               >
                 <Upload size={14} />
-                Upload Document
+                Upload
               </button>
             </div>
           </div>
@@ -978,29 +1021,36 @@ ${buildDocumentContext(activeDocuments)}`,
             <section className="space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-[11px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
-                  Uploaded Documents
+                  Reference Manuals
                 </p>
-                <span className="text-[11px] font-mono text-muted-foreground">{uploadedDocuments.length}</span>
+                <BookOpen size={12} className="text-muted-foreground" />
               </div>
-              {uploadedDocuments.length > 0 ? (
-                uploadedDocuments.map(document => (
-                  <DocumentCard key={document.id} document={document} onToggle={handleToggleDocument} />
-                ))
-              ) : (
-                <div className="rounded-xl border border-dashed border-border bg-field-800/40 p-4 text-sm text-muted-foreground">
-                  Upload a PDF annual report, vet record, SOP, or factsheet to add it here.
-                </div>
-              )}
+              {VET_REFERENCE_MANUALS.map(manual => (
+                <label key={manual.id} className="block rounded-xl border border-border bg-field-700/70 p-3 transition-colors hover:border-primary/35">
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={enabledManualIds.includes(manual.id)}
+                      onChange={() => handleToggleManual(manual.id)}
+                      className="mt-1 h-4 w-4 rounded border-border bg-field-800 accent-[hsl(88_100%_62%)]"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-foreground">{manual.name}</p>
+                      <p className="text-[10px] font-mono text-muted-foreground uppercase mt-1">{manual.author}</p>
+                    </div>
+                  </div>
+                </label>
+              ))}
             </section>
 
             <section className="space-y-3 border-t border-border pt-5">
               <div className="flex items-center justify-between">
                 <p className="text-[11px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
-                  Sample Documents (Demo)
+                  Farm Documents
                 </p>
-                <span className="text-[11px] font-mono text-muted-foreground">{demoDocuments.length}</span>
+                <span className="text-[11px] font-mono text-muted-foreground">{documents.length}</span>
               </div>
-              {demoDocuments.map(document => (
+              {documents.map(document => (
                 <DocumentCard key={document.id} document={document} onToggle={handleToggleDocument} />
               ))}
             </section>
@@ -1014,11 +1064,11 @@ ${buildDocumentContext(activeDocuments)}`,
                 <div className="flex items-center gap-2">
                   <h2 className="font-display text-2xl font-bold text-foreground">Field Oracle</h2>
                   <span className="rounded-full border border-border bg-field-700 px-2 py-1 text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
-                    Powered by Claude
+                    Health Intelligence
                   </span>
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Ask questions grounded only in your selected farm documents.
+                  AI analysis grounded in farm records and veterinary manuals.
                 </p>
               </div>
 
@@ -1027,24 +1077,9 @@ ${buildDocumentContext(activeDocuments)}`,
                 className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground"
               >
                 <Key size={14} />
-                {ENV_API_KEY ? "Claude API Key from .env.local" : apiKey ? "Claude API Key for Session" : "Set API Key"}
+                {ENV_API_KEY ? "API Connected" : apiKey ? "Session Key Set" : "Set API Key"}
               </button>
             </div>
-
-            {!apiKey && !ENV_API_KEY && (
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
-                <div className="flex items-start gap-2">
-                  <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
-                  <p>{DEMO_BANNER_TEXT}</p>
-                </div>
-                <Link
-                  to="/settings"
-                  className="rounded-md border border-warning/30 px-3 py-1.5 text-xs font-mono uppercase tracking-wider text-warning transition-colors hover:bg-warning/10"
-                >
-                  Open Settings
-                </Link>
-              </div>
-            )}
           </div>
 
           <div className="flex-1 overflow-y-auto px-4 py-5 md:px-6">
@@ -1054,7 +1089,12 @@ ${buildDocumentContext(activeDocuments)}`,
                   Suggested Questions
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {FIELD_ORACLE_SUGGESTED_QUESTIONS.map(question => (
+                  {[
+                    "What are the symptoms of Bloat according to the manual?",
+                    "Check my vet records for respiratory issues and compare with BRD protocols",
+                    "Do we have any hardware disease flags in our recent reports?",
+                    "Summarize winter feeding SOP"
+                  ].map(question => (
                     <button
                       key={question}
                       onClick={() => submitQuestion(question)}
@@ -1086,6 +1126,7 @@ ${buildDocumentContext(activeDocuments)}`,
                   onGenerateChecklist={handleGenerateChecklist}
                   onToggleChecklistItem={handleToggleChecklistItem}
                   onCopyChecklist={handleCopyChecklist}
+                  onDownloadReport={handleDownloadReport}
                 />
               ),
             )}
@@ -1102,7 +1143,7 @@ ${buildDocumentContext(activeDocuments)}`,
                 <div className="rounded-2xl border border-border bg-field-700/80 px-4 py-3 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <Loader2 size={14} className="animate-spin text-primary" />
-                    Field Oracle is reading your documents...
+                    Field Oracle is consulting your manuals and records...
                   </div>
                 </div>
               </motion.div>
@@ -1125,7 +1166,7 @@ ${buildDocumentContext(activeDocuments)}`,
                     void submitQuestion(input);
                   }
                 }}
-                placeholder="Ask a question about your selected farm documents..."
+                placeholder="Ask about symptoms, records, or protocols..."
                 className="max-h-[180px] min-h-[44px] w-full resize-none bg-transparent px-1 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground"
               />
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
