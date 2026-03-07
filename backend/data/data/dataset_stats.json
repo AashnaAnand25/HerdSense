@@ -1,0 +1,25 @@
+{
+  "total_images": 60,
+  "train_images": 42,
+  "val_images": 9,
+  "test_images": 9,
+  "classes": [
+    "cow_eating",
+    "cow_walking",
+    "cow_lying_down",
+    "cow_standing",
+    "cow_socializing",
+    "cow_distress",
+    "cow_abnormal_movement",
+    "piglet_nursing",
+    "piglet_fall_risk",
+    "birth_in_progress"
+  ],
+  "image_size": [
+    640,
+    480
+  ],
+  "format": "YOLO",
+  "synthetic": true,
+  "purpose": "Demonstration and testing"
+}

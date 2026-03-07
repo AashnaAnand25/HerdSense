@@ -1,0 +1,38 @@
+# Cow Behavior Dataset Configuration
+
+# Dataset paths (relative to this file)
+path: .
+train: images/train
+val: images/val
+test: images/test
+
+# Number of classes
+nc: 10
+
+# Class names
+names: 
+  0: cow_eating
+  1: cow_walking
+  2: cow_lying_down
+  3: cow_standing
+  4: cow_socializing
+  5: cow_distress
+  6: cow_abnormal_movement
+  7: piglet_nursing
+  8: piglet_fall_risk
+  9: birth_in_progress
+
+# Dataset information
+dataset_info:
+  name: "Herd Health AI Cow Behavior Dataset"
+  version: "1.0"
+  description: "Synthetic dataset for cow behavior detection and health monitoring"
+  total_images: 60
+  train_images: 42
+  val_images: 9
+  test_images: 9
+  source: "Synthetic sample data for demonstration"
+  
+# Annotation format
+annotation_format: "YOLO"
+coordinate_system: "normalized"  # All coordinates normalized between 0-1

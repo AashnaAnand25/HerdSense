@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import AnimalProfile from "./pages/AnimalProfile";
 import FieldOracle from "./pages/FieldOracle";
 import LiveFeed from "./pages/LiveFeed";
+import CameraMonitoring from "./pages/CameraMonitoring";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -31,6 +32,7 @@ const App = () => (
               <Route path="/field-oracle" element={<FieldOracle />} />
               <Route path="/farmgpt" element={<Navigate to="/field-oracle" replace />} />
               <Route path="/livefeed" element={<LiveFeed />} />
+              <Route path="/camera" element={<CameraMonitoring />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
