@@ -8,11 +8,15 @@ export default {
     container: {
       center: true,
       padding: "2rem",
-      screens: {
-        "2xl": "1400px",
-      },
+      screens: { "2xl": "1400px" },
     },
     extend: {
+      fontFamily: {
+        display: ["Syne", "sans-serif"],
+        mono: ["IBM Plex Mono", "monospace"],
+        body: ["DM Sans", "sans-serif"],
+        sans: ["DM Sans", "sans-serif"],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -57,33 +61,57 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        // Custom HerdSense tokens
+        healthy: "hsl(var(--healthy))",
+        warning: "hsl(var(--warning))",
+        danger: "hsl(var(--danger))",
+        lime: {
+          DEFAULT: "hsl(88 100% 62%)",
+          dim: "hsl(88 60% 35%)",
+          dark: "hsl(88 40% 15%)",
+          glow: "hsl(88 100% 75%)",
+        },
+        field: {
+          900: "hsl(135 50% 4%)",
+          800: "hsl(135 45% 6%)",
+          700: "hsl(135 40% 9%)",
+          600: "hsl(135 35% 13%)",
+          500: "hsl(135 30% 18%)",
+          400: "hsl(130 20% 30%)",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      backgroundImage: {
+        "hero-gradient": "var(--gradient-hero)",
+        "card-gradient": "var(--gradient-card)",
+      },
+      boxShadow: {
+        "glow-lime": "var(--glow-primary)",
+        "glow-danger": "var(--glow-danger)",
+        "glow-warning": "var(--glow-warning)",
+        card: "var(--shadow-card)",
+      },
       keyframes: {
-        "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+        "accordion-down": { from: { height: "0" }, to: { height: "var(--radix-accordion-content-height)" } },
+        "accordion-up":   { from: { height: "var(--radix-accordion-content-height)" }, to: { height: "0" } },
+        shimmer: {
+          "0%":   { backgroundPosition: "-200% 0" },
+          "100%": { backgroundPosition: "200% 0" },
         },
-        "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
+        "glow-pulse": {
+          "0%, 100%": { opacity: "1" },
+          "50%":       { opacity: "0.6" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
-        "accordion-up": "accordion-up 0.2s ease-out",
+        "accordion-up":   "accordion-up 0.2s ease-out",
+        shimmer:          "shimmer 2s linear infinite",
+        "glow-pulse":     "glow-pulse 2s ease-in-out infinite",
       },
     },
   },
