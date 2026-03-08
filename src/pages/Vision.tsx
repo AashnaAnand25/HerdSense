@@ -125,9 +125,32 @@ export default function Vision() {
       await fetch(`${VISION_API_BASE}/${endpoint}`, { method: "POST" });
       setCameraPaused((p) => !p);
     } catch {
-      // server offline, just toggle UI
       setCameraPaused((p) => !p);
     }
+  };
+
+  // Recording
+  const [recording, setRecording] = useState(false);
+  const [hasRecording, setHasRecording] = useState(false);
+
+  const toggleRecording = async () => {
+    try {
+      if (recording) {
+        await fetch(`${VISION_API_BASE}/stop_recording`, { method: "POST" });
+        setRecording(false);
+        setHasRecording(true);
+      } else {
+        await fetch(`${VISION_API_BASE}/start_recording`, { method: "POST" });
+        setRecording(true);
+        setHasRecording(false);
+      }
+    } catch {
+      // server offline
+    }
+  };
+
+  const downloadRecording = () => {
+    window.open(`${VISION_API_BASE}/download_recording`, "_blank");
   };
 
   // Poll /results
@@ -187,15 +210,38 @@ export default function Vision() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left — Live camera feed */}
           <div className="card-glass rounded-xl overflow-hidden border-2 border-primary/20 shadow-glow-lime">
-            <div className="px-3 py-2 border-b border-border/50 flex items-center justify-between">
+            <div className="px-3 py-2 border-b border-border/50 flex items-center justify-between gap-2">
               <span className="font-mono text-xs text-muted-foreground">Live vision feed</span>
               {streamOnline && (
-                <button
-                  onClick={toggleCamera}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md font-mono text-xs font-semibold transition-colors ${cameraPaused ? "bg-primary/20 text-primary hover:bg-primary/30" : "bg-field-700 text-muted-foreground hover:bg-field-600 hover:text-foreground"}`}
-                >
-                  {cameraPaused ? <><Play size={11} />Resume</> : <><Pause size={11} />Pause</>}
-                </button>
+                <div className="flex items-center gap-1.5">
+                  {/* Pause / Resume */}
+                  <button
+                    onClick={toggleCamera}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-md font-mono text-xs font-semibold transition-colors ${cameraPaused ? "bg-primary/20 text-primary hover:bg-primary/30" : "bg-field-700 text-muted-foreground hover:bg-field-600 hover:text-foreground"}`}
+                  >
+                    {cameraPaused ? <><Play size={11} />Resume</> : <><Pause size={11} />Pause</>}
+                  </button>
+
+                  {/* Record / Stop */}
+                  <button
+                    onClick={toggleRecording}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-md font-mono text-xs font-semibold transition-colors ${recording ? "bg-danger/20 text-danger hover:bg-danger/30" : "bg-field-700 text-muted-foreground hover:bg-field-600 hover:text-foreground"}`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${recording ? "bg-danger animate-pulse" : "bg-muted-foreground"}`} />
+                    {recording ? "Stop" : "Record"}
+                  </button>
+
+                  {/* Download — appears once a recording is ready */}
+                  {hasRecording && !recording && (
+                    <button
+                      onClick={downloadRecording}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-md font-mono text-xs font-semibold bg-primary/20 text-primary hover:bg-primary/30 transition-colors"
+                    >
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                      Download MP4
+                    </button>
+                  )}
+                </div>
               )}
             </div>
             <div className="relative aspect-video bg-field-900">

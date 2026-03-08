@@ -5,7 +5,7 @@ Run from backend directory (with venv activated):
      python vision_server.py
 Then open the Vision tab in the app; stream at http://localhost:5001/video_feed
 """
-from flask import Flask, Response, jsonify, request
+from flask import Flask, Response, jsonify, request, send_file
 from flask_cors import CORS
 import cv2
 from ultralytics import YOLO
@@ -62,6 +62,12 @@ def _make_placeholder_frame():
 
 latest_results = None  # set below after camera check
 camera_paused = False  # toggled by /pause_camera and /resume_camera
+
+# Recording state
+recording = False
+video_writer = None
+recording_path = None
+rec_lock = threading.Lock()
 
 cap = cv2.VideoCapture(0)
 cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
@@ -257,6 +263,10 @@ def process_frames():
             }
             _, buffer = cv2.imencode(".jpg", frame)
             output_frame = buffer.tobytes()
+        # Write annotated frame to recording if active
+        with rec_lock:
+            if recording and video_writer is not None:
+                video_writer.write(frame)
         time.sleep(0.05)
 
 
@@ -309,6 +319,56 @@ def resume_camera():
 @app.route("/camera_status")
 def camera_status():
     return jsonify({"paused": camera_paused, "available": camera_available})
+
+
+@app.route("/start_recording", methods=["POST"])
+def start_recording():
+    global recording, video_writer, recording_path
+    with rec_lock:
+        if recording:
+            return jsonify({"recording": True, "message": "Already recording"})
+        if not camera_available:
+            return jsonify({"error": "Camera not available"}), 400
+        frame_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or 640
+        frame_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or 480
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+        recording_path = tmp.name
+        tmp.close()
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        video_writer = cv2.VideoWriter(recording_path, fourcc, 20.0, (frame_w, frame_h))
+        recording = True
+    return jsonify({"recording": True})
+
+
+@app.route("/stop_recording", methods=["POST"])
+def stop_recording():
+    global recording, video_writer
+    with rec_lock:
+        if not recording:
+            return jsonify({"recording": False, "ready": bool(recording_path)})
+        recording = False
+        if video_writer:
+            video_writer.release()
+            video_writer = None
+    return jsonify({"recording": False, "ready": bool(recording_path)})
+
+
+@app.route("/recording_status")
+def recording_status():
+    has_file = bool(recording_path and os.path.exists(recording_path))
+    return jsonify({"recording": recording, "has_file": has_file})
+
+
+@app.route("/download_recording")
+def download_recording():
+    if not recording_path or not os.path.exists(recording_path):
+        return jsonify({"error": "No recording available"}), 404
+    return send_file(
+        recording_path,
+        mimetype="video/mp4",
+        as_attachment=True,
+        download_name="herdsense_feed.mp4",
+    )
 
 
 def _classify_coco_cow(xyxy, frame_h):
