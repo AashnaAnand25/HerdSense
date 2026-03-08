@@ -15,6 +15,7 @@ export default defineConfig(() => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "html2canvas": path.resolve(__dirname, "./src/shims/html2canvas.ts"),
     },
   },
 }));
