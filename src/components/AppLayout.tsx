@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Bell, Settings, LayoutDashboard, MessageSquare, Radio, Video, LogOut } from "lucide-react";
+import { Bell, Settings, LayoutDashboard, MessageSquare, Radio, Video, LogOut, Calendar } from "lucide-react";
 import { motion } from "framer-motion";
 import { RECENT_ALERTS } from "@/data/syntheticData";
 import { HerdSenseLogo } from "@/components/brand/HerdSenseLogo";
@@ -23,6 +23,7 @@ const NAV_ITEMS = [
   { to: "/livefeed",  icon: Radio,           label: "Live Feed" },
   { to: "/vision",    icon: Video,           label: "Vision" },
   { to: "/field-oracle", icon: MessageSquare, label: "Field Oracle" },
+  { to: "/farm-planner", icon: Calendar,     label: "Farm Planner" },
   { to: "/settings",  icon: Settings,        label: "Settings" },
 ];
 
