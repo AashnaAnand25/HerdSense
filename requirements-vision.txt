@@ -1,0 +1,5 @@
+# HerdSense Vision tab — run: pip install -r requirements-vision.txt && python vision_server.py
+ultralytics>=8.0.0
+flask>=2.0
+flask-cors>=3.0
+opencv-python>=4.5

@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Bell, Settings, LayoutDashboard, MessageSquare, Radio, LogOut } from "lucide-react";
+import { Bell, Settings, LayoutDashboard, MessageSquare, Radio, Video, LogOut } from "lucide-react";
 import { motion } from "framer-motion";
 import { RECENT_ALERTS } from "@/data/syntheticData";
 import { HerdSenseLogo } from "@/components/brand/HerdSenseLogo";
@@ -21,6 +21,7 @@ interface AppLayoutProps {
 const NAV_ITEMS = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/livefeed",  icon: Radio,           label: "Live Feed" },
+  { to: "/vision",    icon: Video,           label: "Vision" },
   { to: "/field-oracle", icon: MessageSquare, label: "Field Oracle" },
   { to: "/settings",  icon: Settings,        label: "Settings" },
 ];

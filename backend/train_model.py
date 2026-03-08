@@ -172,13 +172,13 @@ class CowBehaviorTrainer:
         """Train the cow behavior detection model"""
         print(f"🚀 Starting training for {epochs} epochs...")
         
-        # Training parameters optimized for livestock detection
+        # Training parameters (only args supported by current Ultralytics train API)
         training_args = {
             'data': dataset_yaml,
             'epochs': epochs,
             'imgsz': 640,
             'batch': 16,
-            'optimizer': 'SGD',  # Better generalization as per research
+            'optimizer': 'SGD',
             'lr0': 0.01,
             'lrf': 0.001,
             'momentum': 0.937,
@@ -188,12 +188,7 @@ class CowBehaviorTrainer:
             'warmup_bias_lr': 0.1,
             'box': 0.05,
             'cls': 0.5,
-            'cls_pw': 1.0,
-            'obj': 1.0,
-            'obj_pw': 1.0,
-            'iou_t': 0.2,
-            'anchor_t': 4.0,
-            'fl_gamma': 0.0,
+            'iou': 0.7,
             'hsv_h': 0.015,
             'hsv_s': 0.7,
             'hsv_v': 0.4,
@@ -213,59 +208,12 @@ class CowBehaviorTrainer:
             'exist_ok': True,
             'pretrained': True,
             'resume': False,
-            'int8': False,
-            'single_cls': False,
-            'rect': False,
-            'cos_lr': False,
-            'close_mosaic': 10,
             'patience': 50,
             'save': True,
-            'save_json': True,
-            'save_hybrid': False,
-            'conf': None,
-            'iou': 0.7,
-            'max_det': 1000,
             'plots': True,
-            'source': None,
-            'vid_stride': 1,
-            'stream_buffer': False,
-            'line_width': 3,
-            'visualize': False,
-            'augment': False,
-            'agnostic_nms': False,
-            'classes': None,
-            'retina_masks': False,
-            'embed': None,
-            'show': False,
-            'save_frames': False,
-            'save_txt': True,
-            'save_conf': False,
-            'save_crop': False,
-            'show_labels': True,
-            'show_conf': True,
-            'show_boxes': True,
-            'color_threshold': 0.25,
-            'max_det_threshold': 0.5,
-            'vid_stride': 1,
-            'line_thickness': 3,
-            'font_size': None,
-            'font': 'Arial.ttf',
-            'text_color': 'white',
-            'text_background_color': 'black',
-            'text_alpha': 0.7,
-            'text_thickness': 2,
-            'text_padding': 2,
-            'fps': 30,
-            'width': None,
-            'height': None,
-            'fourcc': 'mp4v',
-            'count': None,
-            'hide_labels': False,
-            'hide_conf': False,
-            'half': False,
-            'dnn': False,
+            'close_mosaic': 10,
         }
-        
+
         # Start training
         results = self.model.train(**training_args)
         
@@ -333,37 +281,68 @@ class CowBehaviorTrainer:
         }
 
 def main():
-    """Main training pipeline"""
-    # Initialize trainer
-    trainer = CowBehaviorTrainer('./data', model_size='l')
-    
-    # Download and prepare dataset (would need Kaggle API)
-    kaggle_dataset = './datasets/cbvd-cow-behavior-video-dataset'
-    
-    if not os.path.exists(kaggle_dataset):
-        print("⚠️ Please download the CBVD dataset from Kaggle:")
-        print("https://www.kaggle.com/datasets/fandaoerji/cbvd-5cow-behavior-video-dataset")
-        print("And extract it to ./datasets/cbvd-cow-behavior-video-dataset")
-        return
-    
-    # Prepare dataset
-    dataset_yaml = trainer.prepare_dataset(kaggle_dataset)
-    
-    # Add CBAM attention
+    """Main training pipeline. Prefer archive (real CBVD-5) data when available."""
+    import argparse
+    parser = argparse.ArgumentParser(description="Train cow behavior model")
+    parser.add_argument(
+        "--data",
+        type=str,
+        default=None,
+        help="Path to dataset.yaml (e.g. data/archive_yolo/dataset.yaml for archive, or data/dataset.yaml for synthetic)",
+    )
+    parser.add_argument("--epochs", type=int, default=100, help="Training epochs")
+    parser.add_argument("--model-size", type=str, default="l", choices=["n", "s", "m", "l", "x"], help="YOLOv8 size")
+    args = parser.parse_args()
+
+    data_root = Path("./data").resolve()
+    dataset_yaml = None
+
+    if args.data:
+        dataset_yaml = Path(args.data).resolve()
+        if not dataset_yaml.exists():
+            dataset_yaml = (data_root / args.data).resolve()
+        if not dataset_yaml.exists():
+            print(f"❌ Dataset not found: {args.data}")
+            return
+        print(f"📂 Using dataset: {dataset_yaml}")
+    else:
+        # Prefer archive YOLO (real CBVD-5) if present, then synthetic in data/data/
+        archive_yaml = data_root / "archive_yolo" / "dataset.yaml"
+        synthetic_yaml = data_root / "data" / "dataset.yaml"  # generator writes to data/data/
+        fallback_yaml = data_root / "dataset.yaml"
+        if archive_yaml.exists():
+            dataset_yaml = archive_yaml
+            print("📂 Using archive (CBVD-5) dataset: data/archive_yolo/dataset.yaml")
+        elif synthetic_yaml.exists():
+            # Ultralytics resolves path relative to cwd; use absolute path so it finds data/data/images
+            import yaml as yaml_lib
+            with open(synthetic_yaml) as f:
+                cfg = yaml_lib.safe_load(f)
+            cfg["path"] = str((data_root / "data").resolve())
+            runtime_yaml = data_root / "data" / "dataset_runtime.yaml"
+            with open(runtime_yaml, "w") as f:
+                yaml_lib.dump(cfg, f, default_flow_style=False, sort_keys=False)
+            dataset_yaml = runtime_yaml
+            print("📂 Using synthetic dataset: data/data/")
+        elif fallback_yaml.exists():
+            dataset_yaml = fallback_yaml
+            print("📂 Using dataset: data/dataset.yaml")
+        else:
+            print("❌ No dataset found. Either:")
+            print("  1. Convert archive: cd data && python convert_archive_to_yolo.py --images archive_frames")
+            print("  2. Or generate synthetic: python data/generate_synthetic_dataset.py")
+            print("  3. Or pass --data path/to/dataset.yaml")
+            return
+
+    trainer = CowBehaviorTrainer(str(data_root), model_size=args.model_size)
     trainer.add_cbam_to_model()
-    
-    # Train model
-    training_results = trainer.train_model(dataset_yaml, epochs=100)
-    
-    # Evaluate model
-    metrics = trainer.evaluate_model(dataset_yaml)
-    
-    # Export model
-    trainer.export_model('pt')  # PyTorch format
-    trainer.export_model('onnx')  # ONNX for faster inference
-    
-    print("🎉 Training pipeline completed!")
-    print(f"Final model saved with mAP@0.5:0.95: {metrics['mAP50_95']:.3f}")
+    trainer.train_model(str(dataset_yaml), epochs=args.epochs)
+    metrics = trainer.evaluate_model(str(dataset_yaml))
+    # Weights already saved as .pt in runs/; export to ONNX for deployment
+    trainer.export_model("onnx")
+    print("🎉 Training completed!")
+    print(f"   mAP@0.5:0.95: {metrics.get('mAP50_95', 0):.3f}")
+
 
 if __name__ == "__main__":
     main()
