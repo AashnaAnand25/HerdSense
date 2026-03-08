@@ -22,3 +22,22 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# ML model weights
+*.pt
+*.pth
+*.onnx
+
+# YOLO training runs & caches
+runs/
+backend/data/archive/
+backend/data/archive_frames/
+backend/data/archive_yolo/
+backend/data/data/labels/*.cache
+
+# Python venv
+backend/.venv/
+backend/venv/
+
+# Utility/scratch scripts
+backend/fix_frame_names*.py

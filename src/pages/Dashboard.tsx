@@ -1,8 +1,7 @@
 import AppLayout from "@/components/AppLayout";
 import KPIBar from "@/components/dashboard/KPIBar";
 import VaccineAlertsCard from "@/components/dashboard/VaccineAlertsCard";
-import RiskTable from "@/components/dashboard/RiskTable";
-import AlertFeed from "@/components/dashboard/AlertFeed";
+import PriorityAlerts from "@/components/dashboard/PriorityAlerts";
 import ActivityHeatmap from "@/components/dashboard/ActivityHeatmap";
 import HealthTrendChart from "@/components/dashboard/HealthTrendChart";
 import { useFarmSettings } from "@/contexts/FarmSettingsContext";
@@ -31,10 +30,9 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           <div className="space-y-6">
-            <section id="risk-section" className="scroll-mt-24">
-              <RiskTable />
+            <section id="alerts-section" className="scroll-mt-24">
+              <PriorityAlerts />
             </section>
-            <AlertFeed />
           </div>
           <div className="space-y-6">
             <ActivityHeatmap />

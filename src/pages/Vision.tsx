@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import AppLayout from "@/components/AppLayout";
 import { motion } from "framer-motion";
-import { Camera, Bell, Info } from "lucide-react";
+import { Camera, Bell, Info, Upload, X, FileVideo, Loader2, Pause, Play } from "lucide-react";
 
 const VISION_API_BASE = "http://localhost:5001";
 const POLL_MS = 500;
@@ -24,6 +24,26 @@ interface LogEntry {
   risk: string;
 }
 
+interface VideoAnalysisEntry {
+  time: number;
+  behavior: string;
+  confidence: number;
+  risk: string;
+  detections: number;
+}
+
+interface VideoAnalysis {
+  timeline: VideoAnalysisEntry[];
+  summary: {
+    dominant_behavior: string;
+    avg_confidence: number;
+    max_risk: "LOW" | "MEDIUM" | "HIGH";
+    duration_sec: number;
+    frames_analyzed: number;
+  };
+  thumbnail: string | null;
+}
+
 const RISK_STYLES = {
   LOW: "bg-healthy/15 text-healthy border-healthy/40",
   MEDIUM: "bg-warning/15 text-warning border-warning/40",
@@ -41,6 +61,73 @@ export default function Vision() {
   const [streamOnline, setStreamOnline] = useState(false);
   const [behaviorLog, setBehaviorLog] = useState<LogEntry[]>([]);
   const prevBehaviorRef = useRef<string | null>(null);
+
+  // Video upload state
+  const [uploadedVideo, setUploadedVideo] = useState<File | null>(null);
+  const [videoObjectUrl, setVideoObjectUrl] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysis, setAnalysis] = useState<VideoAnalysis | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleVideoSelect = (file: File) => {
+    if (!file.type.startsWith("video/")) {
+      setUploadError("Please upload a video file (mp4, mov, avi, etc.)");
+      return;
+    }
+    if (videoObjectUrl) URL.revokeObjectURL(videoObjectUrl);
+    setUploadedVideo(file);
+    setVideoObjectUrl(URL.createObjectURL(file));
+    setAnalysis(null);
+    setUploadError(null);
+  };
+
+  const handleAnalyze = async () => {
+    if (!uploadedVideo) return;
+    setAnalyzing(true);
+    setUploadError(null);
+    try {
+      const formData = new FormData();
+      formData.append("video", uploadedVideo);
+      const res = await fetch(`${VISION_API_BASE}/analyze_video`, {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Server error ${res.status}`);
+      }
+      const data: VideoAnalysis = await res.json();
+      setAnalysis(data);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Analysis failed";
+      setUploadError(msg.includes("fetch") ? "Vision server offline — start backend first." : msg);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const clearVideo = () => {
+    if (videoObjectUrl) URL.revokeObjectURL(videoObjectUrl);
+    setUploadedVideo(null);
+    setVideoObjectUrl(null);
+    setAnalysis(null);
+    setUploadError(null);
+  };
+
+  // Camera pause/resume
+  const [cameraPaused, setCameraPaused] = useState(false);
+  const toggleCamera = async () => {
+    const endpoint = cameraPaused ? "resume_camera" : "pause_camera";
+    try {
+      await fetch(`${VISION_API_BASE}/${endpoint}`, { method: "POST" });
+      setCameraPaused((p) => !p);
+    } catch {
+      // server offline, just toggle UI
+      setCameraPaused((p) => !p);
+    }
+  };
 
   // Poll /results
   useEffect(() => {
@@ -99,6 +186,17 @@ export default function Vision() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left — Live camera feed */}
           <div className="card-glass rounded-xl overflow-hidden border-2 border-primary/20 shadow-glow-lime">
+            <div className="px-3 py-2 border-b border-border/50 flex items-center justify-between">
+              <span className="font-mono text-xs text-muted-foreground">Live vision feed</span>
+              {streamOnline && (
+                <button
+                  onClick={toggleCamera}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md font-mono text-xs font-semibold transition-colors ${cameraPaused ? "bg-primary/20 text-primary hover:bg-primary/30" : "bg-field-700 text-muted-foreground hover:bg-field-600 hover:text-foreground"}`}
+                >
+                  {cameraPaused ? <><Play size={11} />Resume</> : <><Pause size={11} />Pause</>}
+                </button>
+              )}
+            </div>
             <div className="relative aspect-video bg-field-900">
               {streamOnline ? (
                 <img
@@ -123,10 +221,18 @@ export default function Vision() {
                   </p>
                 </div>
               )}
-              {streamOnline && (
+              {streamOnline && !cameraPaused && (
                 <div className="absolute top-3 left-3 px-2.5 py-1 rounded-md bg-primary/90 text-primary-foreground font-mono text-xs font-bold flex items-center gap-1.5 animate-pulse-lime">
                   <span className="w-2 h-2 rounded-full bg-white" />
                   LIVE
+                </div>
+              )}
+              {cameraPaused && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                  <div className="flex flex-col items-center gap-2">
+                    <Pause size={36} className="text-white/70" />
+                    <span className="font-mono text-xs text-white/70">Camera paused</span>
+                  </div>
                 </div>
               )}
               <div className="absolute bottom-0 left-0 right-0 py-2 px-3 bg-black/70 font-mono text-xs text-primary">
@@ -202,6 +308,123 @@ export default function Vision() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Video Upload & Analysis */}
+        <div className="card-glass rounded-xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+            <h3 className="font-display text-sm font-bold text-foreground flex items-center gap-2">
+              <FileVideo size={15} className="text-primary" />
+              Upload Video for Analysis
+            </h3>
+            {uploadedVideo && (
+              <button onClick={clearVideo} className="text-muted-foreground hover:text-foreground transition-colors">
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          {!uploadedVideo ? (
+            <div
+              className={`m-4 border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center gap-3 cursor-pointer transition-colors ${isDragging ? "border-primary bg-primary/10" : "border-border hover:border-primary/50 hover:bg-primary/5"}`}
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={(e) => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f) handleVideoSelect(f); }}
+            >
+              <Upload size={32} className="text-muted-foreground" />
+              <p className="font-display font-semibold text-foreground text-sm">Drop a video or click to upload</p>
+              <p className="text-xs font-body text-muted-foreground text-center">Upload an archive video from your training set — mp4, mov, avi supported</p>
+              <input ref={fileInputRef} type="file" accept="video/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleVideoSelect(f); }} />
+            </div>
+          ) : (
+            <div className="p-4 space-y-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Video preview */}
+                <div className="rounded-xl overflow-hidden bg-field-900 border border-border aspect-video">
+                  <video src={videoObjectUrl!} controls className="w-full h-full object-contain" />
+                </div>
+
+                {/* Analysis results */}
+                <div className="space-y-3">
+                  {!analysis && !analyzing && (
+                    <div className="flex flex-col items-center justify-center h-full gap-3 py-6">
+                      <p className="text-sm font-body text-muted-foreground text-center">
+                        Ready to analyze <span className="text-foreground font-semibold">{uploadedVideo.name}</span>
+                      </p>
+                      <button
+                        onClick={handleAnalyze}
+                        className="px-5 py-2.5 rounded-lg bg-primary text-primary-foreground font-display font-semibold text-sm hover:bg-primary/90 transition-colors flex items-center gap-2"
+                      >
+                        <Upload size={14} />
+                        Run YOLO Analysis
+                      </button>
+                    </div>
+                  )}
+
+                  {analyzing && (
+                    <div className="flex flex-col items-center justify-center h-full gap-3 py-6">
+                      <Loader2 size={28} className="text-primary animate-spin" />
+                      <p className="text-sm font-mono text-muted-foreground">Analyzing frames with YOLOv8…</p>
+                    </div>
+                  )}
+
+                  {uploadError && (
+                    <div className="rounded-lg border border-danger/40 bg-danger/10 p-3 flex items-start gap-2">
+                      <Bell size={14} className="text-danger shrink-0 mt-0.5" />
+                      <p className="text-sm font-body text-foreground">{uploadError}</p>
+                    </div>
+                  )}
+
+                  {analysis && (
+                    <>
+                      {/* Summary card */}
+                      <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-2">
+                        <p className="font-display text-2xl font-bold text-foreground">{analysis.summary.dominant_behavior}</p>
+                        <div className="h-2.5 rounded-full bg-field-700 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${CONFIDENCE_BAR_COLORS[analysis.summary.max_risk]}`}
+                            style={{ width: `${analysis.summary.avg_confidence * 100}%` }}
+                          />
+                        </div>
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <span className={`inline-flex px-2.5 py-0.5 rounded-lg border font-mono text-xs font-bold ${RISK_STYLES[analysis.summary.max_risk]}`}>
+                            {analysis.summary.max_risk} RISK
+                          </span>
+                          <span className="text-xs font-mono text-muted-foreground">
+                            Avg confidence {Math.round(analysis.summary.avg_confidence * 100)}%
+                          </span>
+                          <span className="text-xs font-mono text-muted-foreground">
+                            {analysis.summary.duration_sec}s · {analysis.summary.frames_analyzed} frames
+                          </span>
+                        </div>
+                        {analysis.thumbnail && (
+                          <img src={`data:image/jpeg;base64,${analysis.thumbnail}`} alt="Best detection frame" className="rounded-lg w-full object-contain max-h-28 bg-field-900 mt-2" />
+                        )}
+                      </div>
+
+                      {/* Timeline */}
+                      <div className="rounded-xl border border-border overflow-hidden">
+                        <div className="px-3 py-2 border-b border-border bg-field-800/50">
+                          <p className="font-display text-xs font-bold text-foreground">Detection timeline</p>
+                        </div>
+                        <div className="max-h-44 overflow-y-auto p-2 space-y-0.5 font-mono text-xs">
+                          {analysis.timeline.map((entry, i) => (
+                            <div key={i} className="flex items-center gap-2 py-0.5 border-b border-border/30 last:border-0">
+                              <span className="text-muted-foreground shrink-0 w-12">{entry.time}s</span>
+                              <span className="text-foreground flex-1 truncate">{entry.behavior}</span>
+                              <span className="text-muted-foreground">{Math.round(entry.confidence * 100)}%</span>
+                              <span className={`shrink-0 ${entry.risk === "HIGH" ? "text-danger" : entry.risk === "MEDIUM" ? "text-warning" : "text-healthy"}`}>{entry.risk}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Classification key */}

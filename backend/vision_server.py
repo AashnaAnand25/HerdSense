@@ -5,7 +5,7 @@ Run from backend directory (with venv activated):
      python vision_server.py
 Then open the Vision tab in the app; stream at http://localhost:5001/video_feed
 """
-from flask import Flask, Response, jsonify
+from flask import Flask, Response, jsonify, request
 from flask_cors import CORS
 import cv2
 from ultralytics import YOLO
@@ -13,13 +13,23 @@ import threading
 import time
 import json
 import os
+import base64
+import tempfile
 
 app = Flask(__name__)
 CORS(app)
 
 # Load YOLOv8 model (downloads automatically on first run)
-# Use custom trained model if available, otherwise default
-model_path = "custom_trained_model.pt" if os.path.exists("custom_trained_model.pt") else "yolov8n.pt"
+# Use real trained model if available, then custom trained, then default
+if os.path.exists("real_cattle_model.pt"):
+    model_path = "real_cattle_model.pt"
+    print("🐄 Using REAL CBVD-5 trained model!")
+elif os.path.exists("custom_trained_model.pt"):
+    model_path = "custom_trained_model.pt"
+    print("🤖 Using custom trained model!")
+else:
+    model_path = "yolov8n.pt"
+    print("📦 Using default model")
 model = YOLO(model_path)
 
 def _default_results(camera_ok=True):
@@ -51,6 +61,7 @@ def _make_placeholder_frame():
 
 
 latest_results = None  # set below after camera check
+camera_paused = False  # toggled by /pause_camera and /resume_camera
 
 cap = cv2.VideoCapture(0)
 cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
@@ -88,8 +99,18 @@ def classify_behavior(detections):
         height = box[3] - box[1]
         aspect_ratio = width / height if height > 0 else 1
         
-        # Map synthetic dataset classes to cattle behaviors
-        if label == "cow_eating":
+        # Map real CBVD-5 classes to cattle behaviors
+        if label == "stand":
+            behaviors.append(("Standing/Walking", conf, "LOW"))
+        elif label == "lying_down":
+            behaviors.append(("Lying Down", conf, "MEDIUM"))
+        elif label == "foraging":
+            behaviors.append(("Grazing", conf, "LOW"))
+        elif label == "drinking_water":
+            behaviors.append(("Drinking", conf, "LOW"))
+        elif label == "rumination":
+            behaviors.append(("Ruminating", conf, "LOW"))
+        elif label == "cow_eating":
             behaviors.append(("Grazing", conf, "LOW"))
         elif label == "cow_walking":
             behaviors.append(("Standing/Walking", conf, "LOW"))
@@ -114,6 +135,9 @@ def process_frames():
             time.sleep(1)
         return
     while True:
+        if camera_paused:
+            time.sleep(0.1)
+            continue
         ret, frame = cap.read()
         if not ret:
             continue
@@ -196,6 +220,143 @@ def get_results():
 @app.route("/health")
 def health():
     return jsonify({"status": "ok"})
+
+
+@app.route("/pause_camera", methods=["POST"])
+def pause_camera():
+    global camera_paused
+    camera_paused = True
+    return jsonify({"paused": True})
+
+
+@app.route("/resume_camera", methods=["POST"])
+def resume_camera():
+    global camera_paused
+    camera_paused = False
+    return jsonify({"paused": False})
+
+
+@app.route("/camera_status")
+def camera_status():
+    return jsonify({"paused": camera_paused, "available": camera_available})
+
+
+def _classify_coco_cow(xyxy, frame_h):
+    """Classify cattle behavior from a COCO 'cow' detection bounding box."""
+    x1, y1, x2, y2 = xyxy
+    width = x2 - x1
+    height = y2 - y1
+    aspect = width / height if height > 0 else 1
+    # Lying down: box is wide relative to height
+    if aspect > 1.6:
+        return "Lying Down", "MEDIUM"
+    # Grazing: head near bottom third of frame (low y1 relative to frame)
+    box_bottom_frac = y2 / frame_h if frame_h > 0 else 1
+    if aspect < 0.9 and box_bottom_frac > 0.6:
+        return "Grazing", "LOW"
+    return "Standing/Walking", "LOW"
+
+
+# Load COCO model for video analysis fallback (large model = better accuracy)
+_coco_model_path = "yolov8l.pt" if os.path.exists("yolov8l.pt") else "yolov8n.pt"
+coco_model = YOLO(_coco_model_path)
+COCO_COW_CLASS = 19  # COCO class index for "cow"
+
+
+@app.route("/analyze_video", methods=["POST"])
+def analyze_video():
+    if "video" not in request.files:
+        return jsonify({"error": "No video file provided"}), 400
+    video_file = request.files["video"]
+    suffix = os.path.splitext(video_file.filename)[1] or ".mp4"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        video_file.save(tmp.name)
+        tmp_path = tmp.name
+    try:
+        cap_v = cv2.VideoCapture(tmp_path)
+        fps = cap_v.get(cv2.CAP_PROP_FPS) or 25
+        total_frames = int(cap_v.get(cv2.CAP_PROP_FRAME_COUNT))
+        # Sample ~60 frames evenly across the video
+        step = max(1, total_frames // 60)
+        timeline = []
+        frame_idx = 0
+        thumb_b64 = None
+        frame_h = int(cap_v.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        while True:
+            ret, frame = cap_v.read()
+            if not ret:
+                break
+            if frame_idx % step == 0:
+                # First try with the COCO model (reliable cow detection)
+                try:
+                    res = coco_model(frame, verbose=False, device=device, conf=0.2, classes=[COCO_COW_CLASS])
+                except Exception:
+                    res = coco_model(frame, verbose=False, device="cpu", conf=0.2, classes=[COCO_COW_CLASS])
+                cow_dets = []
+                for r in res:
+                    for box in r.boxes:
+                        conf = float(box.conf[0])
+                        xyxy = box.xyxy[0].tolist()
+                        behavior, risk = _classify_coco_cow(xyxy, frame_h)
+                        color = (0, 200, 100) if risk == "LOW" else (0, 165, 255) if risk == "MEDIUM" else (0, 0, 255)
+                        cv2.rectangle(frame, (int(xyxy[0]), int(xyxy[1])), (int(xyxy[2]), int(xyxy[3])), color, 3)
+                        cv2.putText(frame, f"{behavior} {conf:.2f}", (int(xyxy[0]), max(int(xyxy[1]) - 10, 10)),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+                        cow_dets.append({"behavior": behavior, "confidence": conf, "risk": risk, "box": xyxy})
+                if cow_dets:
+                    # Pick highest-confidence detection
+                    best = max(cow_dets, key=lambda d: d["confidence"])
+                    behavior, confidence, risk = best["behavior"], best["confidence"], best["risk"]
+                else:
+                    # Fallback: try trained cattle model
+                    try:
+                        res2 = model(frame, verbose=False, device=device, conf=0.05)
+                    except Exception:
+                        res2 = model(frame, verbose=False, device="cpu", conf=0.05)
+                    raw_dets = []
+                    for r in res2:
+                        for box in r.boxes:
+                            raw_dets.append({"label": model.names[int(box.cls[0])], "confidence": float(box.conf[0]), "box": box.xyxy[0].tolist()})
+                    behavior, confidence, risk = classify_behavior(raw_dets)
+                timestamp_sec = round(frame_idx / fps, 2)
+                entry = {"time": timestamp_sec, "behavior": behavior, "confidence": round(confidence, 2), "risk": risk, "detections": len(cow_dets)}
+                timeline.append(entry)
+                if thumb_b64 is None and len(cow_dets) > 0:
+                    _, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 75])
+                    thumb_b64 = base64.b64encode(buf.tobytes()).decode()
+            frame_idx += 1
+        cap_v.release()
+        if thumb_b64 is None and total_frames > 0:
+            cap_v2 = cv2.VideoCapture(tmp_path)
+            ret2, first_frame = cap_v2.read()
+            cap_v2.release()
+            if ret2:
+                _, buf = cv2.imencode(".jpg", first_frame, [cv2.IMWRITE_JPEG_QUALITY, 75])
+                thumb_b64 = base64.b64encode(buf.tobytes()).decode()
+        if timeline:
+            from collections import Counter
+            detected = [e for e in timeline if e["detections"] > 0]
+            behavior_counts = Counter(e["behavior"] for e in detected) if detected else Counter(e["behavior"] for e in timeline)
+            dominant = behavior_counts.most_common(1)[0][0]
+            avg_conf = round(sum(e["confidence"] for e in timeline) / len(timeline), 2)
+            risks = [e["risk"] for e in timeline]
+            max_risk = "HIGH" if "HIGH" in risks else ("MEDIUM" if "MEDIUM" in risks else "LOW")
+            total_secs = round(total_frames / fps, 1)
+        else:
+            dominant, avg_conf, max_risk, total_secs = "No animal detected", 0.0, "LOW", 0
+        return jsonify({
+            "timeline": timeline,
+            "summary": {
+                "dominant_behavior": dominant,
+                "avg_confidence": avg_conf,
+                "max_risk": max_risk,
+                "duration_sec": total_secs,
+                "frames_analyzed": len(timeline),
+            },
+            "thumbnail": thumb_b64,
+        })
+    finally:
+        os.unlink(tmp_path)
 
 
 if __name__ == "__main__":
