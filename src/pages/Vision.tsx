@@ -281,8 +281,12 @@ export default function Vision() {
                     </span>
                   </div>
                   {results.alert && (
-                    <div className="flex items-start gap-2 rounded-lg border-2 border-danger/40 bg-danger/15 p-3 mb-4">
-                      <Bell size={18} className="text-danger shrink-0 mt-0.5" />
+                    <div className={`flex items-start gap-2 rounded-lg border-2 p-3 mb-4 ${
+                      results.risk === "MEDIUM"
+                        ? "border-warning/50 bg-warning/10"
+                        : "border-danger/40 bg-danger/15"
+                    }`}>
+                      <Bell size={18} className={`shrink-0 mt-0.5 ${results.risk === "MEDIUM" ? "text-warning" : "text-danger"}`} />
                       <p className="text-sm font-body text-foreground">{results.alert}</p>
                     </div>
                   )}

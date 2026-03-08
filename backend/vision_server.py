@@ -132,24 +132,29 @@ COCO_PERSON_CLASS = 0  # COCO class index for "person"
 
 
 def classify_human_behavior(xyxy, frame_h, frame_w):
-    """Classify human movement from bounding box geometry."""
+    """Classify human movement from bounding box geometry.
+
+    Crutch/mobility-aid heuristic: a person on crutches has a wider bounding
+    box than a normal standing pose because the crutches extend laterally.
+    Aspect ratios in 0.55-0.85 (wider than upright stance, not horizontal)
+    are flagged as assisted movement with a MEDIUM advisory.
+    """
     x1, y1, x2, y2 = xyxy
     width = x2 - x1
     height = y2 - y1
     aspect = width / height if height > 0 else 1
     box_area_frac = (width * height) / (frame_w * frame_h) if frame_w * frame_h > 0 else 0
-    y_center_frac = ((y1 + y2) / 2) / frame_h if frame_h > 0 else 0.5
 
     if aspect > 1.5:
         return "Lying Down", "MEDIUM"
-    if aspect < 0.45:
-        # Very tall narrow box — likely standing upright
+    # Crutch / mobility-aid: wider-than-normal upright stance
+    if 0.55 <= aspect <= 0.85:
+        return "Assisted Movement (crutches?)", "MEDIUM"
+    if aspect < 0.55:
         return "Standing", "LOW"
-    if aspect < 0.65 and y_center_frac > 0.55:
-        return "Standing", "LOW"
-    if 0.65 <= aspect <= 1.0 and box_area_frac < 0.12:
+    if 0.85 < aspect <= 1.1 and box_area_frac < 0.12:
         return "Walking", "LOW"
-    if 0.65 <= aspect <= 1.2:
+    if 0.85 < aspect <= 1.3:
         return "Crouching / Bending", "LOW"
     return "Standing", "LOW"
 
@@ -228,11 +233,15 @@ def process_frames():
             raw_label = best["label"]  # "person:Standing" etc.
             behavior = raw_label.split(":", 1)[1] if ":" in raw_label else raw_label
             confidence = best["confidence"]
-            risk = "LOW"
+            risk = "MEDIUM" if "Assisted" in behavior or "Lying" in behavior else "LOW"
 
         alert = None
         if risk == "HIGH":
             alert = f"Abnormal behavior detected — {behavior}"
+        elif subject == "human" and "Assisted" in behavior:
+            alert = "Mobility aid detected — ensure safe, clear pathways and no trip hazards nearby."
+        elif behavior == "Lying Down" and subject == "human":
+            alert = "Person on ground detected — check if assistance is needed."
         elif behavior == "Lying Down" and confidence > 0.7:
             alert = "Extended lying detected — possible health concern"
         with lock:
