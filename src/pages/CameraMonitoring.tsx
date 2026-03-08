@@ -439,74 +439,6 @@ const CameraMonitoring: React.FC = () => {
                 </div>
               </div>
               
-              {/* Video Upload Section */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                        <Upload className="h-5 w-5" />
-                        Upload Video for Lameness Detection
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
-                      <input
-                        type="file"
-                        accept="video/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            handleVideoUpload(file);
-                          }
-                        }}
-                        className="hidden"
-                        id="video-upload"
-                      />
-                      <label 
-                        htmlFor="video-upload" 
-                        className="flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50"
-                      >
-                        <Upload className="h-8 w-8 text-gray-400 mb-2" />
-                        <span className="text-sm text-gray-600">
-                          Click to upload video or drag and drop
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          Supports MP4, WebM, MOV (Max 100MB)
-                        </span>
-                      </label>
-                    </div>
-                    
-                    {uploadedVideo && (
-                      <div className="mt-4 p-3 bg-green-50 rounded-lg">
-                        <div className="flex items-center gap-2 mb-2">
-                          <CheckCircle className="h-5 w-5 text-green-600" />
-                          <span className="font-medium">Video Uploaded</span>
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          <p><strong>File:</strong> {uploadedVideo.name}</p>
-                          <p><strong>Size:</strong> {(uploadedVideo.size / 1024 / 1024).toFixed(2)} MB</p>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {isProcessingVideo && (
-                      <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                          <span className="font-medium">Processing video for lameness detection...</span>
-                        </div>
-                        <div className="text-sm text-gray-600 mt-2">
-                          Analyzing frames for cow behavior patterns...
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </CardContent>
-          </Card>
-        </div>
-
         {/* Analysis Panel */}
         <div className="space-y-6">
           {/* Health Score */}
@@ -586,11 +518,12 @@ const CameraMonitoring: React.FC = () => {
 
       {/* Tabs for different features */}
       <Tabs defaultValue="alerts" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="alerts">Alerts</TabsTrigger>
           <TabsTrigger value="piglet">Piglet Monitor</TabsTrigger>
           <TabsTrigger value="vaccination">Vaccination</TabsTrigger>
           <TabsTrigger value="comparison">Before/After</TabsTrigger>
+          <TabsTrigger value="vision">Vision</TabsTrigger>
         </TabsList>
 
         {/* Alerts Tab */}
@@ -749,6 +682,73 @@ const CameraMonitoring: React.FC = () => {
                   </div>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Vision Tab */}
+        <TabsContent value="vision" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                    <Upload className="h-5 w-5" />
+                    Upload Video for Lameness Detection
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                  <input
+                    type="file"
+                    accept="video/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        handleVideoUpload(file);
+                      }
+                    }}
+                    className="hidden"
+                    id="vision-video-upload"
+                  />
+                  <label 
+                    htmlFor="vision-video-upload" 
+                    className="flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50"
+                  >
+                    <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                    <span className="text-sm text-gray-600">
+                      Click to upload video or drag and drop
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      Supports MP4, WebM, MOV (Max 100MB)
+                    </span>
+                  </label>
+                </div>
+                
+                {uploadedVideo && (
+                  <div className="mt-4 p-3 bg-green-50 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle className="h-5 w-5 text-green-600" />
+                      <span className="font-medium">Video Uploaded</span>
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      <p><strong>File:</strong> {uploadedVideo.name}</p>
+                      <p><strong>Size:</strong> {(uploadedVideo.size / 1024 / 1024).toFixed(2)} MB</p>
+                    </div>
+                  </div>
+                )}
+                
+                {isProcessingVideo && (
+                  <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                      <span className="font-medium">Processing video for lameness detection...</span>
+                    </div>
+                    <div className="text-sm text-gray-600 mt-2">
+                      Analyzing frames for cow behavior patterns...
+                    </div>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
