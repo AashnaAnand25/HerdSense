@@ -162,7 +162,9 @@ export default function Vision() {
           const data: VisionResults = await r.json();
           setResults(data);
           setStreamOnline(true); // server is up
-          if (prevBehaviorRef.current !== data.behavior) {
+          // Skip logging "Lying Down" for human subjects — false positive from wide bounding boxes
+          const isHumanLyingFP = data.subject === "human" && data.behavior === "Lying Down";
+          if (prevBehaviorRef.current !== data.behavior && !isHumanLyingFP) {
             prevBehaviorRef.current = data.behavior;
             setBehaviorLog((log) => {
               const entry: LogEntry = {

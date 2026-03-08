@@ -151,7 +151,9 @@ def classify_human_behavior(xyxy, frame_h, frame_w):
     aspect = width / height if height > 0 else 1
     box_area_frac = (width * height) / (frame_w * frame_h) if frame_w * frame_h > 0 else 0
 
-    if aspect > 1.5:
+    # Only flag lying down if person is nearly horizontal (aspect > 2.5)
+    # — avoids false positives from crutch/wide stance detections
+    if aspect > 2.5:
         return "Lying Down", "MEDIUM"
     # Crutch / mobility-aid: wider-than-normal upright stance
     if 0.55 <= aspect <= 0.85:
@@ -160,7 +162,7 @@ def classify_human_behavior(xyxy, frame_h, frame_w):
         return "Standing", "LOW"
     if 0.85 < aspect <= 1.1 and box_area_frac < 0.12:
         return "Walking", "LOW"
-    if 0.85 < aspect <= 1.3:
+    if 0.85 < aspect <= 1.8:
         return "Crouching / Bending", "LOW"
     return "Standing", "LOW"
 
