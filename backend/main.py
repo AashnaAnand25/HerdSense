@@ -28,10 +28,19 @@ app.add_middleware(
 )
 
 # Redis client for real-time alerts
-redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+try:
+    redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+except:
+    redis_client = None
+    print("⚠️ Redis connection failed - alerts will be limited")
 
 # Load YOLOv8 model with CBAM attention mechanism
-model = YOLO('yolov8l.pt')  # Will be replaced with custom trained model
+try:
+    model = YOLO('yolov8l.pt')  # Will be replaced with custom trained model
+    print("✅ YOLOv8 model loaded successfully")
+except Exception as e:
+    print(f"⚠️ Model loading failed: {e}")
+    model = None
 
 class DetectionResult(BaseModel):
     class_name: str
@@ -78,33 +87,47 @@ async def startup_event():
 async def root():
     return {"message": "Herd Health AI Computer Vision Backend", "status": "active"}
 
-@app.post("/detect/cows")
-async def detect_cows(file: UploadFile = File(...)):
+@app.post("/detect/lameness")
+async def detect_lameness(file: UploadFile = File(...)):
     """
-    Detect cows in uploaded image with confidence scoring
-    Returns bounding boxes, confidence scores, and health indicators
+    Detect lameness in cows with confidence scoring
     """
     try:
-        # Read and process image
         contents = await file.read()
-        nparr = np.frombuffer(contents, np.uint8)
-        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        image_bytes = await file.read()
+        
+        # Convert to numpy array
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        print(f"📊 Image bytes received: {len(image_bytes)}")
+        
+        # Handle OpenCV version compatibility
+        try:
+            # Try with flags first (newer versions)
+            image = cv2.imdecode(nparr, flags=cv2.IMREAD_COLOR)
+            print(f"✅ Image decoded with flags: {image.shape if image is not None else 'None'}")
+        except Exception as primary_error:
+            print(f"⚠️ Primary decode failed: {primary_error}")
+            try:
+                # Fallback without flags (older versions)
+                image = cv2.imdecode(nparr)
+                print(f"🔄 Fallback decode without flags: {image.shape if image is not None else 'None'}")
+            except Exception as fallback_error:
+                print(f"❌ All decode methods failed: {fallback_error}")
+                raise HTTPException(status_code=500, detail=f"Image processing failed: {str(fallback_error)}")
         
         if image is None:
-            raise HTTPException(status_code=400, detail="Invalid image format")
+            raise HTTPException(status_code=400, detail="Invalid image file")
         
         # Run YOLO detection
         results = model(image)
         
         detections = []
-        health_alerts = []
+        health_score = 100.0
         
         for result in results:
             boxes = result.boxes
             if boxes is not None:
-                for i, box in enumerate(boxes):
-                    # Extract detection info
-                    x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                for box in boxes:
                     conf = box.conf[0].cpu().numpy()
                     cls = int(box.cls[0].cpu().numpy())
                     
@@ -114,28 +137,86 @@ async def detect_cows(file: UploadFile = File(...)):
                     detection = DetectionResult(
                         class_name=class_name,
                         confidence=float(conf),
-                        bbox=[float(x1), float(y1), float(x2), float(y2)],
+                        bbox=[float(x) for x in box.xyxy[0].cpu().numpy()],
                         timestamp=datetime.now()
                     )
                     detections.append(detection)
                     
-                    # Generate health alerts based on detection
-                    if conf > 0.7:  # High confidence detection
-                        alert = analyze_cow_behavior(class_name, conf, [x1, y1, x2, y2], image)
-                        if alert:
-                            health_alerts.append(alert)
+                    # Adjust health score based on lameness
+                    if 'lameness' in class_name.lower():
+                        if 'severe' in class_name.lower():
+                            health_score -= (conf * 30)
+                        elif 'mild' in class_name.lower():
+                            health_score -= (conf * 15)
         
         return {
-            "success": True,
             "detections": detections,
-            "alerts": health_alerts,
-            "total_cows": len([d for d in detections if "cow" in d.class_name.lower()]),
-            "processing_time": "fast",
-            "model_version": "YOLOv8l-CBAM"
+            "health_score": health_score,
+            "total_animals": len(detections),
+            "image_info": {
+                "width": image.shape[1],
+                "height": image.shape[0],
+                "channels": image.shape[2] if len(image.shape) > 2 else 1
+            }
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Detection failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lameness detection failed: {str(e)}")
+
+@app.post("/analyze/lameness")
+async def analyze_lameness(file: UploadFile = File(...)):
+    """
+    Analyze lameness patterns for health monitoring
+    """
+    try:
+        # Read and process image
+        contents = await file.read()
+        image_bytes = await file.read()
+        
+        # Convert to numpy array
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        image = cv2.imdecode(nparr)
+        
+        if image is None:
+            raise HTTPException(status_code=400, detail="Invalid image file")
+        
+        # Run YOLO detection
+        results = model(image)
+        
+        behaviors = []
+        health_score = 100.0
+        
+        for result in results:
+            boxes = result.boxes
+            if boxes is not None:
+                for box in boxes:
+                    conf = box.conf[0].cpu().numpy()
+                    cls = int(box.cls[0].cpu().numpy())
+                    
+                    # Map class to lameness detection
+                    class_name = LAMENESS_CLASSES.get(cls, 'unknown')
+                    
+                    # Analyze specific behaviors
+                    behavior_analysis = analyze_specific_behavior(class_name, conf, image)
+                    if behavior_analysis:
+                        behaviors.append(behavior_analysis)
+                        
+                        # Adjust health score based on lameness
+                        if 'lameness' in class_name.lower():
+                            if 'severe' in class_name.lower():
+                                health_score -= (conf * 30)
+                            elif 'mild' in class_name.lower():
+                                health_score -= (conf * 15)
+        
+        return {
+            "behaviors": behaviors,
+            "health_score": max(0, health_score),
+            "total_animals": len(behaviors),
+            "recommendations": generate_health_recommendations(behaviors, health_score)
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lameness analysis failed: {str(e)}")
 
 @app.post("/analyze/behavior")
 async def analyze_behavior(file: UploadFile = File(...)):
@@ -536,4 +617,15 @@ def analyze_treatment_effectiveness(before_results, after_results) -> Dict:
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    
+    # Find available port
+    port = 8001  # Start with different port
+    
+    print(f"🚀 Starting Herd Health AI Backend on port {port}")
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=port,
+        reload=True,
+        log_level="info"
+    )

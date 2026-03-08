@@ -54,7 +54,7 @@ interface BehaviorAnalysis {
   health_indicators: Record<string, number>;
 }
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'http://localhost:8001';
 
 const CameraMonitoring: React.FC = () => {
   const [isLive, setIsLive] = useState(false);
@@ -71,6 +71,8 @@ const CameraMonitoring: React.FC = () => {
   const [beforeImage, setBeforeImage] = useState<File | null>(null);
   const [afterImage, setAfterImage] = useState<File | null>(null);
   const [comparisonResults, setComparisonResults] = useState<any>(null);
+  const [uploadedVideo, setUploadedVideo] = useState<File | null>(null);
+  const [isProcessingVideo, setIsProcessingVideo] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -221,6 +223,44 @@ const CameraMonitoring: React.FC = () => {
       await performComparison();
     }
   }, [beforeImage, afterImage]);
+
+  // Handle video upload for lameness detection
+  const handleVideoUpload = useCallback(async (file: File) => {
+    setUploadedVideo(file);
+    setIsProcessingVideo(true);
+    
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch(`${API_BASE_URL}/detect/lameness`, {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (response.ok) {
+        const results = await response.json();
+        setDetections(results.detections || []);
+        setOverallHealthScore(results.health_score || 100);
+        
+        // Extract behavior analysis if available
+        if (results.detections && results.detections.length > 0) {
+          const detection = results.detections[0];
+          setBehaviorAnalysis({
+            behavior_type: detection.class_name,
+            confidence: detection.confidence,
+            duration: 0,
+            animal_count: 1,
+            health_indicators: { lameness_score: detection.confidence }
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Video analysis error:', error);
+    } finally {
+      setIsProcessingVideo(false);
+    }
+  }, []);
 
   // Perform before/after comparison
   const performComparison = useCallback(async () => {
@@ -398,6 +438,71 @@ const CameraMonitoring: React.FC = () => {
                   <span className="text-sm">{(confidenceThreshold * 100).toFixed(0)}%</span>
                 </div>
               </div>
+              
+              {/* Video Upload Section */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                        <Upload className="h-5 w-5" />
+                        Upload Video for Lameness Detection
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                      <input
+                        type="file"
+                        accept="video/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            handleVideoUpload(file);
+                          }
+                        }}
+                        className="hidden"
+                        id="video-upload"
+                      />
+                      <label 
+                        htmlFor="video-upload" 
+                        className="flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50"
+                      >
+                        <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                        <span className="text-sm text-gray-600">
+                          Click to upload video or drag and drop
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          Supports MP4, WebM, MOV (Max 100MB)
+                        </span>
+                      </label>
+                    </div>
+                    
+                    {uploadedVideo && (
+                      <div className="mt-4 p-3 bg-green-50 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <CheckCircle className="h-5 w-5 text-green-600" />
+                          <span className="font-medium">Video Uploaded</span>
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          <p><strong>File:</strong> {uploadedVideo.name}</p>
+                          <p><strong>Size:</strong> {(uploadedVideo.size / 1024 / 1024).toFixed(2)} MB</p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {isProcessingVideo && (
+                      <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                          <span className="font-medium">Processing video for lameness detection...</span>
+                        </div>
+                        <div className="text-sm text-gray-600 mt-2">
+                          Analyzing frames for cow behavior patterns...
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
             </CardContent>
           </Card>
         </div>
