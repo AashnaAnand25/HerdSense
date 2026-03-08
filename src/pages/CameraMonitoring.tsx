@@ -438,7 +438,10 @@ const CameraMonitoring: React.FC = () => {
                   <span className="text-sm">{(confidenceThreshold * 100).toFixed(0)}%</span>
                 </div>
               </div>
-              
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Analysis Panel */}
         <div className="space-y-6">
           {/* Health Score */}
